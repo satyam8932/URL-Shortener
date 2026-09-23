@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"errors"
 	"log/slog"
 	"net/http"
@@ -31,6 +32,18 @@ func logRequests(logger *slog.Logger, next http.Handler) http.Handler {
 			slog.Int("bytes", recorder.bytes),
 			slog.Float64("duration_ms", float64(time.Since(start).Microseconds())/1000),
 		)
+	})
+}
+
+// limitDuration cancels the request context after timeout. A handler still
+// running past the server's write deadline can no longer send its response,
+// so its database and Redis calls are stopped too instead of piling up
+// behind a slow dependency.
+func limitDuration(timeout time.Duration, next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ctx, cancel := context.WithTimeout(r.Context(), timeout)
+		defer cancel()
+		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }
 

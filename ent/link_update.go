@@ -69,6 +69,20 @@ func (_u *LinkUpdate) ClearExpiresAt() *LinkUpdate {
 	return _u
 }
 
+// SetExpired sets the "expired" field.
+func (_u *LinkUpdate) SetExpired(v bool) *LinkUpdate {
+	_u.mutation.SetExpired(v)
+	return _u
+}
+
+// SetNillableExpired sets the "expired" field if the given value is not nil.
+func (_u *LinkUpdate) SetNillableExpired(v *bool) *LinkUpdate {
+	if v != nil {
+		_u.SetExpired(*v)
+	}
+	return _u
+}
+
 // Mutation returns the LinkMutation object of the builder.
 func (_u *LinkUpdate) Mutation() *LinkMutation {
 	return _u.mutation
@@ -135,6 +149,9 @@ func (_u *LinkUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	if _u.mutation.ExpiresAtCleared() {
 		_spec.ClearField(link.FieldExpiresAt, field.TypeTime)
 	}
+	if value, ok := _u.mutation.Expired(); ok {
+		_spec.SetField(link.FieldExpired, field.TypeBool, value)
+	}
 	if _node, err = sqlgraph.UpdateNodes(ctx, _u.driver, _spec); err != nil {
 		if _, ok := err.(*sqlgraph.NotFoundError); ok {
 			err = &NotFoundError{link.Label}
@@ -193,6 +210,20 @@ func (_u *LinkUpdateOne) SetNillableExpiresAt(v *time.Time) *LinkUpdateOne {
 // ClearExpiresAt clears the value of the "expires_at" field.
 func (_u *LinkUpdateOne) ClearExpiresAt() *LinkUpdateOne {
 	_u.mutation.ClearExpiresAt()
+	return _u
+}
+
+// SetExpired sets the "expired" field.
+func (_u *LinkUpdateOne) SetExpired(v bool) *LinkUpdateOne {
+	_u.mutation.SetExpired(v)
+	return _u
+}
+
+// SetNillableExpired sets the "expired" field if the given value is not nil.
+func (_u *LinkUpdateOne) SetNillableExpired(v *bool) *LinkUpdateOne {
+	if v != nil {
+		_u.SetExpired(*v)
+	}
 	return _u
 }
 
@@ -291,6 +322,9 @@ func (_u *LinkUpdateOne) sqlSave(ctx context.Context) (_node *Link, err error) {
 	}
 	if _u.mutation.ExpiresAtCleared() {
 		_spec.ClearField(link.FieldExpiresAt, field.TypeTime)
+	}
+	if value, ok := _u.mutation.Expired(); ok {
+		_spec.SetField(link.FieldExpired, field.TypeBool, value)
 	}
 	_node = &Link{config: _u.config}
 	_spec.Assign = _node.assignValues

@@ -17,6 +17,7 @@ var (
 		{Name: "click_count", Type: field.TypeInt64, Default: 0},
 		{Name: "created_at", Type: field.TypeTime, Default: "CURRENT_TIMESTAMP"},
 		{Name: "expires_at", Type: field.TypeTime, Nullable: true},
+		{Name: "expired", Type: field.TypeBool, Default: false},
 	}
 	// LinksTable holds the schema information for the "links" table.
 	LinksTable = &schema.Table{

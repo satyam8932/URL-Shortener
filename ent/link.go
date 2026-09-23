@@ -26,7 +26,9 @@ type Link struct {
 	// CreatedAt holds the value of the "created_at" field.
 	CreatedAt time.Time `json:"created_at,omitempty"`
 	// ExpiresAt holds the value of the "expires_at" field.
-	ExpiresAt    *time.Time `json:"expires_at,omitempty"`
+	ExpiresAt *time.Time `json:"expires_at,omitempty"`
+	// Expired holds the value of the "expired" field.
+	Expired      bool `json:"expired,omitempty"`
 	selectValues sql.SelectValues
 }
 
@@ -35,6 +37,8 @@ func (*Link) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
+		case link.FieldExpired:
+			values[i] = new(sql.NullBool)
 		case link.FieldID, link.FieldClickCount:
 			values[i] = new(sql.NullInt64)
 		case link.FieldShortCode, link.FieldOriginalURL:
@@ -93,6 +97,12 @@ func (_m *Link) assignValues(columns []string, values []any) error {
 				_m.ExpiresAt = new(time.Time)
 				*_m.ExpiresAt = value.Time
 			}
+		case link.FieldExpired:
+			if value, ok := values[i].(*sql.NullBool); !ok {
+				return fmt.Errorf("unexpected type %T for field expired", values[i])
+			} else if value.Valid {
+				_m.Expired = value.Bool
+			}
 		default:
 			_m.selectValues.Set(columns[i], values[i])
 		}
@@ -145,6 +155,9 @@ func (_m *Link) String() string {
 		builder.WriteString("expires_at=")
 		builder.WriteString(v.Format(time.ANSIC))
 	}
+	builder.WriteString(", ")
+	builder.WriteString("expired=")
+	builder.WriteString(fmt.Sprintf("%v", _m.Expired))
 	builder.WriteByte(')')
 	return builder.String()
 }

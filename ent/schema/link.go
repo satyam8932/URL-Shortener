@@ -57,6 +57,10 @@ func (Link) Fields() []ent.Field {
 		field.Time("expires_at").
 			Optional().
 			Nillable(),
+
+		// Set by the expiry sweeper so the redirect path never compares timestamps.
+		field.Bool("expired").
+			Default(false),
 	}
 }
 

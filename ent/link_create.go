@@ -74,6 +74,20 @@ func (_c *LinkCreate) SetNillableExpiresAt(v *time.Time) *LinkCreate {
 	return _c
 }
 
+// SetExpired sets the "expired" field.
+func (_c *LinkCreate) SetExpired(v bool) *LinkCreate {
+	_c.mutation.SetExpired(v)
+	return _c
+}
+
+// SetNillableExpired sets the "expired" field if the given value is not nil.
+func (_c *LinkCreate) SetNillableExpired(v *bool) *LinkCreate {
+	if v != nil {
+		_c.SetExpired(*v)
+	}
+	return _c
+}
+
 // SetID sets the "id" field.
 func (_c *LinkCreate) SetID(v int64) *LinkCreate {
 	_c.mutation.SetID(v)
@@ -123,6 +137,10 @@ func (_c *LinkCreate) defaults() {
 		v := link.DefaultCreatedAt()
 		_c.mutation.SetCreatedAt(v)
 	}
+	if _, ok := _c.mutation.Expired(); !ok {
+		v := link.DefaultExpired
+		_c.mutation.SetExpired(v)
+	}
 }
 
 // check runs all checks and user-defined validators on the builder.
@@ -153,6 +171,9 @@ func (_c *LinkCreate) check() error {
 	}
 	if _, ok := _c.mutation.CreatedAt(); !ok {
 		return &ValidationError{Name: "created_at", err: errors.New(`ent: missing required field "Link.created_at"`)}
+	}
+	if _, ok := _c.mutation.Expired(); !ok {
+		return &ValidationError{Name: "expired", err: errors.New(`ent: missing required field "Link.expired"`)}
 	}
 	return nil
 }
@@ -205,6 +226,10 @@ func (_c *LinkCreate) createSpec() (*Link, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.ExpiresAt(); ok {
 		_spec.SetField(link.FieldExpiresAt, field.TypeTime, value)
 		_node.ExpiresAt = &value
+	}
+	if value, ok := _c.mutation.Expired(); ok {
+		_spec.SetField(link.FieldExpired, field.TypeBool, value)
+		_node.Expired = value
 	}
 	return _node, _spec
 }

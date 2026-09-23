@@ -48,6 +48,26 @@ tidy: ## Sync go.mod and go.sum with the imports
 docker-build: ## Build the container image for the local platform
 	docker build --build-arg VERSION=$(VERSION) -t $(IMAGE):$(VERSION) .
 
+# k6 runs in Docker, so nothing needs installing. It reaches the API on the
+# host through host.docker.internal. Pass k6 settings through K6_ENV, e.g.
+#   make loadtest SCRIPT=redirect K6_ENV="-e RATE=500 -e DURATION=30s"
+SCRIPT ?= redirect
+K6_ENV ?=
+
+.PHONY: loadtest
+loadtest: ## Run a k6 load test from ./loadtest (SCRIPT=redirect|shorten)
+	$(WITH_ENV) docker run --rm -i \
+		--add-host=host.docker.internal:host-gateway \
+		-v "$(CURDIR)/loadtest:/scripts:ro" \
+		-e BASE_URL=http://host.docker.internal:8080 \
+		-e ADMIN_TOKEN="$$ADMIN_TOKEN" \
+		grafana/k6 run $(K6_ENV) /scripts/$(SCRIPT).js
+
+.PHONY: loadtest-clean
+loadtest-clean: ## Delete every link created by the load tests
+	$(WITH_ENV) docker run --rm postgres:17-alpine psql "$$DATABASE_URL" \
+		-c "DELETE FROM links WHERE original_url LIKE 'https://example.com/loadtest/%'"
+
 .PHONY: up
 up: ## Migrate and run the API in Docker via compose
 	docker compose up --build

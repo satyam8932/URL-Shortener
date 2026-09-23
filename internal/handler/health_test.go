@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 )
 
 // pingerFunc adapts a function to the Pinger interface.
@@ -18,8 +19,9 @@ func (f pingerFunc) PingContext(ctx context.Context) error { return f(ctx) }
 
 func newTestRouter(db Pinger) http.Handler {
 	return NewRouter(Dependencies{
-		Logger: slog.New(slog.NewTextHandler(io.Discard, nil)),
-		DB:     db,
+		Logger:         slog.New(slog.NewTextHandler(io.Discard, nil)),
+		DB:             db,
+		RequestTimeout: time.Second,
 	})
 }
 

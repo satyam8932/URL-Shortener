@@ -1,6 +1,16 @@
-# Local run of the production image. `docker compose up --build` applies the
-# schema first and starts the API only if the migration succeeds.
+# Local run of the production image. `docker compose up --build` starts Redis,
+# applies the schema, and starts the API only if the migration succeeds.
 services:
+  redis:
+    image: redis:8-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 2s
+      timeout: 2s
+      retries: 10
+
   migrate:
     build: .
     image: url-shortener:local
@@ -11,9 +21,16 @@ services:
     build: .
     image: url-shortener:local
     env_file: .env
+    environment:
+      REDIS_URL: redis://redis:6379/0
     ports:
       - "8080:8080"
     depends_on:
+      redis:
+        condition: service_healthy
       migrate:
         condition: service_completed_successfully
     restart: unless-stopped
+    # Docker's default of 10s would kill the API mid-shutdown: draining
+    # requests (HTTP_SHUTDOWN_TIMEOUT, 15s) plus the final click flush (5s).
+    stop_grace_period: 30s

@@ -39,6 +39,7 @@ type LinkMutation struct {
 	addclick_count *int64
 	created_at     *time.Time
 	expires_at     *time.Time
+	expired        *bool
 	clearedFields  map[string]struct{}
 	done           bool
 	oldValue       func(context.Context) (*Link, error)
@@ -362,6 +363,42 @@ func (m *LinkMutation) ResetExpiresAt() {
 	delete(m.clearedFields, link.FieldExpiresAt)
 }
 
+// SetExpired sets the "expired" field.
+func (m *LinkMutation) SetExpired(b bool) {
+	m.expired = &b
+}
+
+// Expired returns the value of the "expired" field in the mutation.
+func (m *LinkMutation) Expired() (r bool, exists bool) {
+	v := m.expired
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldExpired returns the old "expired" field's value of the Link entity.
+// If the Link object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *LinkMutation) OldExpired(ctx context.Context) (v bool, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldExpired is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldExpired requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldExpired: %w", err)
+	}
+	return oldValue.Expired, nil
+}
+
+// ResetExpired resets all changes to the "expired" field.
+func (m *LinkMutation) ResetExpired() {
+	m.expired = nil
+}
+
 // Where appends a list predicates to the LinkMutation builder.
 func (m *LinkMutation) Where(ps ...predicate.Link) {
 	m.predicates = append(m.predicates, ps...)
@@ -396,7 +433,7 @@ func (m *LinkMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *LinkMutation) Fields() []string {
-	fields := make([]string, 0, 5)
+	fields := make([]string, 0, 6)
 	if m.short_code != nil {
 		fields = append(fields, link.FieldShortCode)
 	}
@@ -411,6 +448,9 @@ func (m *LinkMutation) Fields() []string {
 	}
 	if m.expires_at != nil {
 		fields = append(fields, link.FieldExpiresAt)
+	}
+	if m.expired != nil {
+		fields = append(fields, link.FieldExpired)
 	}
 	return fields
 }
@@ -430,6 +470,8 @@ func (m *LinkMutation) Field(name string) (ent.Value, bool) {
 		return m.CreatedAt()
 	case link.FieldExpiresAt:
 		return m.ExpiresAt()
+	case link.FieldExpired:
+		return m.Expired()
 	}
 	return nil, false
 }
@@ -449,6 +491,8 @@ func (m *LinkMutation) OldField(ctx context.Context, name string) (ent.Value, er
 		return m.OldCreatedAt(ctx)
 	case link.FieldExpiresAt:
 		return m.OldExpiresAt(ctx)
+	case link.FieldExpired:
+		return m.OldExpired(ctx)
 	}
 	return nil, fmt.Errorf("unknown Link field %s", name)
 }
@@ -492,6 +536,13 @@ func (m *LinkMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetExpiresAt(v)
+		return nil
+	case link.FieldExpired:
+		v, ok := value.(bool)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetExpired(v)
 		return nil
 	}
 	return fmt.Errorf("unknown Link field %s", name)
@@ -580,6 +631,9 @@ func (m *LinkMutation) ResetField(name string) error {
 		return nil
 	case link.FieldExpiresAt:
 		m.ResetExpiresAt()
+		return nil
+	case link.FieldExpired:
+		m.ResetExpired()
 		return nil
 	}
 	return fmt.Errorf("unknown Link field %s", name)

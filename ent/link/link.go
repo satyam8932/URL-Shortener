@@ -23,6 +23,8 @@ const (
 	FieldCreatedAt = "created_at"
 	// FieldExpiresAt holds the string denoting the expires_at field in the database.
 	FieldExpiresAt = "expires_at"
+	// FieldExpired holds the string denoting the expired field in the database.
+	FieldExpired = "expired"
 	// Table holds the table name of the link in the database.
 	Table = "links"
 )
@@ -35,6 +37,7 @@ var Columns = []string{
 	FieldClickCount,
 	FieldCreatedAt,
 	FieldExpiresAt,
+	FieldExpired,
 }
 
 // ValidColumn reports if the column name is valid (part of the table columns).
@@ -58,6 +61,8 @@ var (
 	ClickCountValidator func(int64) error
 	// DefaultCreatedAt holds the default value on creation for the "created_at" field.
 	DefaultCreatedAt func() time.Time
+	// DefaultExpired holds the default value on creation for the "expired" field.
+	DefaultExpired bool
 )
 
 // OrderOption defines the ordering options for the Link queries.
@@ -91,4 +96,9 @@ func ByCreatedAt(opts ...sql.OrderTermOption) OrderOption {
 // ByExpiresAt orders the results by the expires_at field.
 func ByExpiresAt(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldExpiresAt, opts...).ToFunc()
+}
+
+// ByExpired orders the results by the expired field.
+func ByExpired(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldExpired, opts...).ToFunc()
 }

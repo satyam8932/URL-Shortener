@@ -46,4 +46,8 @@ func init() {
 	linkDescCreatedAt := linkFields[4].Descriptor()
 	// link.DefaultCreatedAt holds the default value on creation for the created_at field.
 	link.DefaultCreatedAt = linkDescCreatedAt.Default.(func() time.Time)
+	// linkDescExpired is the schema descriptor for expired field.
+	linkDescExpired := linkFields[6].Descriptor()
+	// link.DefaultExpired holds the default value on creation for the expired field.
+	link.DefaultExpired = linkDescExpired.Default.(bool)
 }

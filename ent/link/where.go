@@ -79,6 +79,11 @@ func ExpiresAt(v time.Time) predicate.Link {
 	return predicate.Link(sql.FieldEQ(FieldExpiresAt, v))
 }
 
+// Expired applies equality check predicate on the "expired" field. It's identical to ExpiredEQ.
+func Expired(v bool) predicate.Link {
+	return predicate.Link(sql.FieldEQ(FieldExpired, v))
+}
+
 // ShortCodeEQ applies the EQ predicate on the "short_code" field.
 func ShortCodeEQ(v string) predicate.Link {
 	return predicate.Link(sql.FieldEQ(FieldShortCode, v))
@@ -337,6 +342,16 @@ func ExpiresAtIsNil() predicate.Link {
 // ExpiresAtNotNil applies the NotNil predicate on the "expires_at" field.
 func ExpiresAtNotNil() predicate.Link {
 	return predicate.Link(sql.FieldNotNull(FieldExpiresAt))
+}
+
+// ExpiredEQ applies the EQ predicate on the "expired" field.
+func ExpiredEQ(v bool) predicate.Link {
+	return predicate.Link(sql.FieldEQ(FieldExpired, v))
+}
+
+// ExpiredNEQ applies the NEQ predicate on the "expired" field.
+func ExpiredNEQ(v bool) predicate.Link {
+	return predicate.Link(sql.FieldNEQ(FieldExpired, v))
 }
 
 // And groups predicates with the AND operator between them.

@@ -3,4 +3,4 @@
 // and schema/ is generated: never edit it by hand, run `make generate`.
 package ent
 
-//go:generate go tool ent generate ./schema
+//go:generate go tool ent generate --feature sql/execquery ./schema

@@ -4,18 +4,28 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net/url"
 	"strconv"
+	"strings"
 	"time"
 )
+
+const minAdminTokenLength = 32
 
 // LookupFunc resolves an environment variable. os.LookupEnv satisfies it;
 // tests pass a map-backed implementation instead of mutating the process env.
 type LookupFunc func(key string) (string, bool)
 
 type API struct {
-	HTTP     HTTP
-	Database Database
-	LogLevel slog.Level
+	HTTP                HTTP
+	Database            Database
+	Redis               Redis
+	RateLimit           RateLimit
+	CacheTTL            time.Duration
+	PublicBaseURL       string
+	AdminToken          string
+	ExpirySweepInterval time.Duration
+	LogLevel            slog.Level
 }
 
 type Migrate struct {
@@ -30,6 +40,21 @@ type HTTP struct {
 	WriteTimeout      time.Duration
 	IdleTimeout       time.Duration
 	ShutdownTimeout   time.Duration
+}
+
+type Redis struct {
+	URL string
+	// Timeout bounds every Redis dial, read and write. Redis is optional at
+	// runtime, so a slow Redis must cost little latency before requests fall back.
+	Timeout time.Duration
+}
+
+type RateLimit struct {
+	PerMinute int
+	Burst     int
+	// ClientIPHeader names a header set by a trusted reverse proxy that
+	// carries the real client IP. Empty means use the connection address.
+	ClientIPHeader string
 }
 
 type Database struct {
@@ -56,7 +81,20 @@ func LoadAPI(lookup LookupFunc) (API, error) {
 			ShutdownTimeout:   r.positiveDuration("HTTP_SHUTDOWN_TIMEOUT", 15*time.Second),
 		},
 		Database: r.database("DATABASE_URL_POOLED"),
-		LogLevel: r.logLevel("LOG_LEVEL", slog.LevelInfo),
+		Redis: Redis{
+			URL:     r.requiredString("REDIS_URL"),
+			Timeout: r.positiveDuration("REDIS_TIMEOUT", 100*time.Millisecond),
+		},
+		CacheTTL: r.positiveDuration("CACHE_TTL", 10*time.Minute),
+		RateLimit: RateLimit{
+			PerMinute:      r.positiveInt("RATE_LIMIT_PER_MINUTE", 10),
+			Burst:          r.positiveInt("RATE_LIMIT_BURST", 5),
+			ClientIPHeader: r.optionalString("CLIENT_IP_HEADER", ""),
+		},
+		PublicBaseURL:       r.baseURL("PUBLIC_BASE_URL", "http://localhost:8080"),
+		AdminToken:          r.secret("ADMIN_TOKEN", minAdminTokenLength),
+		ExpirySweepInterval: r.positiveDuration("EXPIRY_SWEEP_INTERVAL", time.Minute),
+		LogLevel:            r.logLevel("LOG_LEVEL", slog.LevelInfo),
 	}
 
 	return cfg, r.err()
@@ -127,6 +165,29 @@ func (r *reader) optionalString(key, fallback string) string {
 		return fallback
 	}
 	return value
+}
+
+// secret returns the required value of key, recording an error if it is
+// shorter than minLength. The value itself is never included in errors.
+func (r *reader) secret(key string, minLength int) string {
+	value := r.requiredString(key)
+	if value != "" && len(value) < minLength {
+		r.errs = append(r.errs, fmt.Errorf("%s must be at least %d characters", key, minLength))
+	}
+	return value
+}
+
+// baseURL parses key as an absolute http(s) URL and returns it without a
+// trailing slash, so paths can be appended with a single "/".
+func (r *reader) baseURL(key, fallback string) string {
+	raw := r.optionalString(key, fallback)
+
+	u, err := url.Parse(raw)
+	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
+		r.errs = append(r.errs, fmt.Errorf("%s must be an absolute http or https URL, got %q", key, raw))
+		return fallback
+	}
+	return strings.TrimRight(raw, "/")
 }
 
 // positiveInt parses key as an integer greater than zero, returning fallback

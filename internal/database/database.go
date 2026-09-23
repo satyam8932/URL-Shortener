@@ -1,5 +1,5 @@
-// Package database opens the Postgres connection pool and builds the ent
-// client on top of it.
+// Package database opens the connections to the data stores: the Postgres
+// pool behind the ent client, and Redis.
 package database
 
 import (

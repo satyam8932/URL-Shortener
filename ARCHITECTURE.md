@@ -133,8 +133,9 @@ expires_at      TIMESTAMPTZ     NULLABLE
 
 1. On redirect, the handler responds with the 302 **before** touching the
    counter, redirect latency must not depend on write throughput.
-2. The handler pushes `{short_code, delta: 1}` onto a buffered channel
-   (capacity: 100).
+2. The handler pushes the short code onto a buffered channel (capacity:
+   10,000; originally 100, raised after load testing showed a single flush
+   to a remote Postgres takes long enough for 100 slots to overflow).
 3. A background consumer goroutine (or small worker pool) drains the
    channel, batches deltas per `short_code` over a short window (e.g. every
    200ms or every N messages, whichever comes first), and applies them as:
@@ -159,17 +160,19 @@ Redis or an external broker at this scale.
 
 ## 8. Rate Limiting
 
-**Design: token bucket, implemented in-process with a mutex-guarded map,
+**Design: token bucket stored in Redis, updated atomically by a Lua script,
 applied to `POST /shorten` only.**
 
 - One bucket per client IP, refilled at a fixed rate, capacity capped.
 - Applied only to the creation endpoint. The read path (`GET /{code}`) is
   cheap (single indexed lookup) and is the legitimate core function of the
   service, throttling it would hurt real users for no real protection benefit.
-- In-process (not Redis-backed) is the correct choice at single-instance
-  scale. A shared, cross-instance limiter only becomes necessary once the
-  service runs on multiple nodes behind a load balancer, at which point the
-  limiter state needs to be centralized, see §10.
+- Redis-backed so every instance behind a load balancer shares one limit per
+  client. The script reads Redis's own clock, so instances with skewed clocks
+  agree, and sets a TTL so idle buckets are dropped automatically.
+- Fails open: if Redis is unreachable the request is allowed and a warning is
+  logged. Availability of link creation wins over abuse protection during an
+  outage.
 
 ---
 
@@ -190,19 +193,26 @@ check on every read.**
 
 ---
 
-## 10. Scaling Path (design-only — not built at current scale)
+## 10. Redis Cache and Scaling Path
+
+**Built:** a read-through Redis cache on the `GET /{code}` lookup. Key:
+`link:{short_code}`, value: `original_url`. TTL is `CACHE_TTL` (default 10m),
+capped at the link's `expires_at` so the cache never serves a link past its
+expiry. Only active links are cached; misses and expired links are not.
+Deleting a link evicts its key. A redirect that read the row just before the
+delete can re-cache it, so a deleted link may keep working for at most one
+TTL. Stats are never cached because the click count must be fresh. If Redis
+is unreachable, lookups fall back to Postgres. Concurrent misses for the same
+code share one Postgres lookup (singleflight), so a burst of traffic to an
+uncached link does not stampede the connection pool.
+
+**Design-only, not built:**
 
 The following are documented as the scaling plan if traffic grows well past
 100M/month, and are **not implemented in the current build**, current scale
 (100M reads/month, ~193 peak RPS) is comfortably served by a single
 Postgres instance with proper indexing.
 
-- **Redis, read-through cache** in front of the `short_code → original_url`
-  lookup once read volume makes repeated identical DB hits measurably
-  costly. Cache key: `short_code`, value: `original_url` + `expires_at`,
-  TTL matching or slightly exceeding the sweeper interval.
-- **Redis-backed rate limiting** once the service runs on multiple
-  instances and limiter state needs to be shared rather than per-process.
 - **Read replicas** for the `GET /{code}` path once a single primary
   can't absorb read volume, writes stay on the primary.
 - **Vertical partitioning / sharding** by `short_code` range or hash, only
@@ -221,8 +231,8 @@ Postgres instance with proper indexing.
 | HTTP routing | `net/http` (Go 1.22+ method-aware `ServeMux`) | Zero external dependency, no framework overhead at this request volume |
 | Database | PostgreSQL (Neon) | Relational integrity for the uniqueness/idempotency requirements in §5 |
 | ORM / query layer | `ent` | Compile-time-checked schema and queries, avoids hand-written SQL mistakes without hiding SQL entirely |
-| Caching | None at current scale (see §10 for future plan) | Not a bottleneck at ~193 peak RPS on indexed Postgres lookups |
-| Rate limiting | In-process token bucket (`sync.Mutex` + map) | Matches single-instance current scale; exercises Go concurrency directly |
+| Caching | Redis read-through cache on redirects (§10) | Serves hot links without a Postgres round trip |
+| Rate limiting | Redis token bucket via Lua script (§8) | Limits hold across multiple instances |
 | Click counting | In-process buffered channel + background consumer | Async, avoids adding write latency to the redirect hot path |
 | Expiry | Background ticker goroutine | Avoids per-request overhead; eventual consistency is an acceptable trade here |
 
@@ -230,17 +240,17 @@ Postgres instance with proper indexing.
 
 ## 12. Correctness Checklist
 
-- [ ] Uniqueness of `short_code` enforced at the DB level (`UNIQUE`
+- [x] Uniqueness of `short_code` enforced at the DB level (`UNIQUE`
       constraint), not just application logic, belt and suspenders against
       any future concurrent-insert edge case.
-- [ ] Redirect endpoint returns 302 (not 301), confirm intentionally,
+- [x] Redirect endpoint returns 302 (not 301), confirm intentionally,
       301 gets cached by browsers and will suppress repeat hits to the
       server, undermining click tracking.
-- [ ] Click-count consumer batches correctly under concurrent load, verify
+- [x] Click-count consumer batches correctly under concurrent load, verify
       with `go test -race`.
-- [ ] Rate limiter is correct under concurrent requests from the same IP,
+- [x] Rate limiter is correct under concurrent requests from the same IP,
       verify with `go test -race` and a small concurrent load test.
-- [ ] Expired links return `410 Gone` from the sweeper's flag, not a
+- [x] Expired links return `410 Gone` from the sweeper's flag, not a
       broken redirect, once swept.
-- [ ] Idempotent creation lookup on `original_url` is actually hit before
+- [x] Idempotent creation lookup on `original_url` is actually hit before
       generating a new code, not after.
