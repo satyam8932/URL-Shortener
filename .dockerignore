@@ -1,0 +1,9 @@
+# Allowlist: only what the build needs enters the context. Secrets such as
+# .env can never leak into an image layer by accident.
+*
+!go.mod
+!go.sum
+!cmd/
+!ent/
+!internal/
+**/*_test.go

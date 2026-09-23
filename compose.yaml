@@ -1,0 +1,19 @@
+# Local run of the production image. `docker compose up --build` applies the
+# schema first and starts the API only if the migration succeeds.
+services:
+  migrate:
+    build: .
+    image: url-shortener:local
+    entrypoint: ["/usr/local/bin/migrate"]
+    env_file: .env
+
+  api:
+    build: .
+    image: url-shortener:local
+    env_file: .env
+    ports:
+      - "8080:8080"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
