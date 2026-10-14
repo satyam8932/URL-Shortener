@@ -4,10 +4,10 @@ go 1.27.1
 
 require (
 	entgo.io/ent v0.14.6
-	github.com/alicebob/miniredis/v2 v2.39.0
+	github.com/alicebob/miniredis/v2 v2.40.0
 	github.com/jackc/pgx/v5 v5.11.0
-	github.com/redis/go-redis/v9 v9.22.0
-	golang.org/x/sync v0.23.0
+	github.com/redis/go-redis/v9 v9.23.0
+	golang.org/x/sync v0.24.0
 )
 
 require (
@@ -42,7 +42,7 @@ require (
 	github.com/yuin/gopher-lua v1.1.1 // indirect
 	github.com/zclconf/go-cty v1.14.4 // indirect
 	github.com/zclconf/go-cty-yaml v1.1.0 // indirect
-	go.uber.org/atomic v1.11.0 // indirect
+	go.uber.org/atomic v1.12.0 // indirect
 	golang.org/x/mod v0.41.0 // indirect
 	golang.org/x/sys v0.48.0 // indirect
 	golang.org/x/text v0.29.0 // indirect
